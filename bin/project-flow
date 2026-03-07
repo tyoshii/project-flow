@@ -17,7 +17,7 @@ Usage: project-flow <command>
 
 Commands:
   setup    Setup in current directory (repo root)
-  run      Start pollers (tmux session)
+  run      Start pollers (tmux session) [--debug]
   stop     Stop pollers
   attach   Attach to running tmux session
   update   Update project-flow to latest version
@@ -140,21 +140,22 @@ cmd_run() {
   echo "Poll interval: ${POLL_INTERVAL}s"
   echo ""
 
-  # Pass config file path to each watcher via env var
+  # Pass config file path and debug flag to each watcher via env var
   local conf_path="$PROJECT_CONF_FILE"
-  RESTART_CMD='while true; do PROJECT_FLOW_CONF="%s" bash %s || true; echo "[$(date +%%H:%%M:%%S)] Crash detected. Restarting in 10s..."; sleep 10; done'
+  local debug_flag="${PROJECT_FLOW_DEBUG:-0}"
+  RESTART_CMD='while true; do PROJECT_FLOW_CONF="%s" PROJECT_FLOW_DEBUG="%s" bash %s || true; echo "[$(date +%%H:%%M:%%S)] Crash detected. Restarting in 10s..."; sleep 10; done'
 
   tmux new-session -d -s "$session_name" -n "main" \
-    "$(printf "$RESTART_CMD" "$conf_path" "$PROJECT_FLOW_DIR/lib/watch-analysis.sh")"
+    "$(printf "$RESTART_CMD" "$conf_path" "$debug_flag" "$PROJECT_FLOW_DIR/lib/watch-analysis.sh")"
 
   tmux split-window -h -t "${session_name}:main" \
-    "$(printf "$RESTART_CMD" "$conf_path" "$PROJECT_FLOW_DIR/lib/watch-dev.sh")"
+    "$(printf "$RESTART_CMD" "$conf_path" "$debug_flag" "$PROJECT_FLOW_DIR/lib/watch-dev.sh")"
 
   tmux split-window -v -t "${session_name}:main.0" \
-    "$(printf "$RESTART_CMD" "$conf_path" "$PROJECT_FLOW_DIR/lib/watch-review.sh")"
+    "$(printf "$RESTART_CMD" "$conf_path" "$debug_flag" "$PROJECT_FLOW_DIR/lib/watch-review.sh")"
 
   tmux split-window -v -t "${session_name}:main.1" \
-    "$(printf "$RESTART_CMD" "$conf_path" "$PROJECT_FLOW_DIR/lib/watch-accept.sh")"
+    "$(printf "$RESTART_CMD" "$conf_path" "$debug_flag" "$PROJECT_FLOW_DIR/lib/watch-accept.sh")"
 
   tmux set-option -t "$session_name" pane-border-status top
   tmux set-option -t "$session_name" pane-border-format " #{pane_index}: #T "
@@ -233,6 +234,14 @@ cmd_logs() {
 
 # Main dispatch
 command="${1:-}"
+shift || true
+
+# Parse flags
+for arg in "$@"; do
+  case "$arg" in
+    --debug) export PROJECT_FLOW_DEBUG=1 ;;
+  esac
+done
 
 case "$command" in
   setup)   cmd_setup ;;

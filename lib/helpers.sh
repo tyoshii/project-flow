@@ -262,4 +262,8 @@ log() {
 log_info() { log "INFO" "$@"; }
 log_error() { log "ERROR" "$@"; }
 log_warn() { log "WARN" "$@"; }
-log_debug() { log "DEBUG" "$@"; }
+log_debug() {
+  if [[ "${PROJECT_FLOW_DEBUG:-}" == "1" ]]; then
+    log "DEBUG" "$@"
+  fi
+}
