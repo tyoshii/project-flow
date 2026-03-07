@@ -20,6 +20,7 @@ Commands:
   run      Start pollers (tmux session)
   stop     Stop pollers
   attach   Attach to running tmux session
+  update   Update project-flow to latest version
   status   Show running project-flow sessions
   logs     Tail log files
 
@@ -198,6 +199,26 @@ cmd_attach() {
   fi
 }
 
+cmd_update() {
+  echo "Updating project-flow..."
+  local current_rev
+  current_rev=$(git -C "$PROJECT_FLOW_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+  if ! git -C "$PROJECT_FLOW_DIR" pull --ff-only 2>&1; then
+    echo "ERROR: Update failed. Try manually: cd $PROJECT_FLOW_DIR && git pull"
+    exit 1
+  fi
+
+  local new_rev
+  new_rev=$(git -C "$PROJECT_FLOW_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+  if [[ "$current_rev" == "$new_rev" ]]; then
+    echo "Already up to date. ($current_rev)"
+  else
+    echo "Updated: $current_rev -> $new_rev"
+  fi
+}
+
 cmd_status() {
   echo "=== Running project-flow sessions ==="
   tmux list-sessions 2>/dev/null | grep "^pf-" || echo "None"
@@ -218,6 +239,7 @@ case "$command" in
   run)     cmd_run ;;
   stop)    cmd_stop ;;
   attach)  cmd_attach ;;
+  update)  cmd_update ;;
   status)  cmd_status ;;
   logs)    cmd_logs ;;
   -h|--help|help|"") usage ;;
