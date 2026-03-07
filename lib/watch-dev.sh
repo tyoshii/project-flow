@@ -3,25 +3,25 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
 
 LOG_FILE="$LOG_DIR/dev.log"
-log_info "Dev ウォッチャーを起動しました" | tee -a "$LOG_FILE"
+log_info "Dev watcher started" | tee -a "$LOG_FILE"
 
 while true; do
-  log_info "Dev ステータスの issue をチェック中..." | tee -a "$LOG_FILE"
+  log_info "Checking for Dev issues..." | tee -a "$LOG_FILE"
 
   items=$(get_items_by_status "$STATUS_DEV")
   count=$(echo "$items" | jq 'length')
 
   if [[ "$count" -eq 0 ]]; then
-    log_info "Dev ステータスの issue はありません" | tee -a "$LOG_FILE"
+    log_info "No issues in Dev" | tee -a "$LOG_FILE"
   else
-    log_info "Dev ステータスの issue が ${count} 件あります" | tee -a "$LOG_FILE"
+    log_info "Found ${count} issue(s) in Dev" | tee -a "$LOG_FILE"
 
     echo "$items" | jq -c '.[]' | while read -r item; do
       item_id=$(echo "$item" | jq -r '.itemId')
       issue_number=$(echo "$item" | jq -r '.number')
       issue_title=$(echo "$item" | jq -r '.title')
 
-      log_info "Issue #${issue_number} (${issue_title}) の実装を開始します..." | tee -a "$LOG_FILE"
+      log_info "Starting implementation for issue #${issue_number} (${issue_title})..." | tee -a "$LOG_FILE"
 
       details=$(get_issue_details "$issue_number")
       title=$(echo "$details" | jq -r '.title')
@@ -52,41 +52,41 @@ ${comments}
 - Base branch: main
 "
 
-      log_info "Claude を起動して Issue #${issue_number} を実装します..." | tee -a "$LOG_FILE"
+      log_info "Running Claude for issue #${issue_number}..." | tee -a "$LOG_FILE"
 
       claude_output=$(run_claude \
         "Dev #${issue_number}" \
         "$prompt" \
         '"Bash" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" "WebFetch"' \
         "$repo_path") || {
-        log_error "Claude の実行に失敗しました (Issue #${issue_number})" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: 実装失敗 — Claude の実行中にエラーが発生しました。"
+        log_error "Claude execution failed for issue #${issue_number}" | tee -a "$LOG_FILE"
+        comment_body="🤖 Dev: Implementation failed — error during Claude execution."
         add_issue_comment "$issue_number" "$comment_body"
         move_item_to_status "$item_id" "$STATUS_ANALYSIS"
         continue
       }
 
-      log_info "Claude 出力 (Issue #${issue_number}):" >> "$LOG_FILE"
+      log_info "Claude output for issue #${issue_number}:" >> "$LOG_FILE"
       echo "$claude_output" >> "$LOG_FILE"
 
       pr_url=$(echo "$claude_output" | grep -oE 'https://github.com/[^/]+/[^/]+/pull/[0-9]+' | head -1 || echo "")
 
       if [[ -n "$pr_url" ]]; then
-        log_info "Issue #${issue_number}: PR 作成成功 → Review に移動します ($pr_url)" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: 実装完了 — PR ${pr_url} を作成しました。Review に移行します。"
+        log_info "Issue #${issue_number}: PR created -> moving to Review ($pr_url)" | tee -a "$LOG_FILE"
+        comment_body="🤖 Dev: Implementation complete — PR ${pr_url} created. Moving to Review."
         add_issue_comment "$issue_number" "$comment_body"
         move_item_to_status "$item_id" "$STATUS_REVIEW"
       else
-        log_warn "Issue #${issue_number}: PR URL が見つかりません → Analysis に戻します" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: PR の作成に至りませんでした。Analysis に戻します。"
+        log_warn "Issue #${issue_number}: No PR URL found -> moving back to Analysis" | tee -a "$LOG_FILE"
+        comment_body="🤖 Dev: Could not create PR. Moving back to Analysis."
         add_issue_comment "$issue_number" "$comment_body"
         move_item_to_status "$item_id" "$STATUS_ANALYSIS"
       fi
 
-      log_info "Issue #${issue_number} の処理が完了しました" | tee -a "$LOG_FILE"
+      log_info "Issue #${issue_number} processing complete" | tee -a "$LOG_FILE"
     done
   fi
 
-  log_info "${POLL_INTERVAL}秒後に再チェックします..." | tee -a "$LOG_FILE"
+  log_info "Next check in ${POLL_INTERVAL}s..." | tee -a "$LOG_FILE"
   sleep "$POLL_INTERVAL"
 done

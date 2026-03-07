@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# config.sh — プロジェクト設定のロード
+# config.sh — Load project configuration
 #
-# カレントディレクトリ（またはその親）にある .project-flow.conf を読み込む
+# Reads .project-flow.conf from current directory (or parent directories)
 
 set -euo pipefail
 
 PROJECT_FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# .project-flow.conf を探す（カレントディレクトリから上に辿る）
+# Find .project-flow.conf by traversing up from PWD
 find_config() {
   local dir="$PWD"
   while [[ "$dir" != "/" ]]; do
@@ -20,20 +20,20 @@ find_config() {
   echo ""
 }
 
-# 設定を読み込む
+# Load configuration
 load_project_config() {
   local conf_file
   conf_file=$(find_config)
 
   if [[ -z "$conf_file" ]]; then
-    echo "ERROR: .project-flow.conf が見つかりません。先に project-flow setup を実行してください。" >&2
+    echo "ERROR: .project-flow.conf not found. Run project-flow setup first." >&2
     return 1
   fi
 
   PROJECT_ROOT="$(dirname "$conf_file")"
   PROJECT_CONF_FILE="$conf_file"
 
-  # デフォルト値
+  # Defaults
   REPO=""
   OWNER=""
   REPO_NAME=""
@@ -49,15 +49,15 @@ load_project_config() {
   POLL_INTERVAL=60
   LOCAL_REPO_PATH=""
 
-  # 設定ファイルを読み込み
+  # Source config file
   source "$conf_file"
 
-  # LOCAL_REPO_PATH のデフォルトはプロジェクトルート
+  # Default LOCAL_REPO_PATH to project root
   if [[ -z "$LOCAL_REPO_PATH" ]]; then
     LOCAL_REPO_PATH="$PROJECT_ROOT"
   fi
 
-  # ログ・プロンプトディレクトリ
+  # Derived paths
   local safe_name="${OWNER}__${REPO_NAME}"
   LOG_DIR="${PROJECT_ROOT}/.project-flow-logs"
   PROMPTS_DIR="${PROJECT_FLOW_DIR}/prompts"
@@ -66,7 +66,7 @@ load_project_config() {
   mkdir -p "$LOG_DIR"
 }
 
-# 設定ファイルを作成
+# Write configuration file
 save_project_config() {
   cat > "$PROJECT_CONF_FILE" << EOF
 # project-flow config

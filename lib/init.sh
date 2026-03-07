@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# init.sh — 各スクリプト共通の初期化
-# 使い方: source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
-# 環境変数 PROJECT_FLOW_CONF が設定されていればそれを使う
+# init.sh — Common initialization for watcher scripts
+# Usage: source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
+# Uses PROJECT_FLOW_CONF env var if set
 
 PROJECT_FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 source "$PROJECT_FLOW_DIR/lib/config.sh"
 
-# PROJECT_FLOW_CONF が指定されていればそのディレクトリに cd してからロード
+# If PROJECT_FLOW_CONF is set, cd to its directory before loading config
 if [[ -n "${PROJECT_FLOW_CONF:-}" ]]; then
   cd "$(dirname "$PROJECT_FLOW_CONF")"
 fi

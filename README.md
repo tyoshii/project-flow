@@ -28,26 +28,48 @@ Backlog → Analysis → Dev → Review → QA → Accept → Done
 curl -fsSL https://raw.githubusercontent.com/tyoshii/project-flow/main/install.sh | bash
 ```
 
-## 使い方
+## Usage
 
-```bash
-# 1. セットアップ（GitHub Project を作成）
-project-flow setup owner/repo
+```
+Usage: project-flow <command>
 
-# 2. Web UI で Status フィールドに以下を追加:
-#    Backlog, Analysis, Dev, Review, QA, Accept, Done
+Commands:
+  setup    Setup in current directory (repo root)
+  run      Start pollers (tmux session)
+  stop     Stop pollers
+  attach   Attach to running tmux session
+  status   Show running project-flow sessions
+  logs     Tail log files
 
-# 3. ポーラー起動
-project-flow start owner/repo
-
-# 4. issue を Project に追加して Backlog に配置
-# 5. Analysis に移動すると自動処理が始まる
+Workflow:
+  Backlog → Analysis → Dev → Review → QA → Accept → Done
+             (Claude)   (Claude)  (Claude)  (Human)  (Auto)
 ```
 
-## その他のコマンド
+### Quick Start
 
 ```bash
-project-flow stop owner/repo    # 停止
-project-flow status              # 実行中のプロジェクト一覧
-project-flow logs owner/repo    # ログ表示
+# 1. Setup (creates GitHub Project & .project-flow.conf)
+cd ~/repos/my-project
+project-flow setup
+
+# 2. Add status options in GitHub Project settings:
+#    Backlog, Analysis, Dev, Review, QA, Accept, Done
+
+# 3. Start pollers
+project-flow run
+
+# 4. Add issues to the Project board and move to Analysis
+#    → Claude handles the rest automatically
+```
+
+### Commands
+
+```bash
+project-flow setup     # Create .project-flow.conf & GitHub Project
+project-flow run       # Start tmux session with all pollers
+project-flow attach    # Attach to running tmux session
+project-flow stop      # Stop tmux session
+project-flow status    # List running project-flow sessions
+project-flow logs      # Tail log files
 ```

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# helpers.sh — GitHub Project GraphQL ヘルパー関数群
-# config.sh が事前に source されていること
+# helpers.sh — GitHub Project GraphQL helper functions
+# Requires config.sh to be sourced first
 
-# Project の node ID を取得
+# Get Project node ID
 get_project_id() {
   local result
   result=$(gh api graphql -f query='
@@ -16,7 +16,7 @@ get_project_id() {
   ' -f owner="$OWNER" -F number="$PROJECT_NUMBER" \
     --jq '.data.organization.projectV2.id' 2>/dev/null) && [[ -n "$result" ]] && echo "$result" && return
 
-  # organization でなければ user でフォールバック
+  # Fallback to user if not an organization
   gh api graphql -f query='
     query($owner: String!, $number: Int!) {
       user(login: $owner) {
@@ -29,7 +29,7 @@ get_project_id() {
     --jq '.data.user.projectV2.id'
 }
 
-# Status フィールドの ID と各オプション ID を取得
+# Get Status field ID and option IDs
 get_status_field() {
   local project_id
   project_id=$(get_project_id)
@@ -57,7 +57,7 @@ get_status_field() {
     --jq '.data.node.fields.nodes[] | select(.name == "'"$STATUS_FIELD_NAME"'")'
 }
 
-# 特定ステータスの issue 一覧を取得
+# Get items by status
 get_items_by_status() {
   local target_status="$1"
   local project_id
@@ -113,7 +113,7 @@ get_items_by_status() {
     ]' 2>/dev/null || echo '[]'
 }
 
-# issue のステータスを変更
+# Move item to a different status
 move_item_to_status() {
   local item_id="$1"
   local target_status="$2"
@@ -157,7 +157,7 @@ move_item_to_status() {
     --silent
 }
 
-# issue の詳細情報を取得（本文・コメント）
+# Get issue details (body, comments)
 get_issue_details() {
   local issue_number="$1"
 
@@ -185,14 +185,14 @@ get_issue_details() {
     --jq '.data.repository.issue'
 }
 
-# issue にコメントを追加
+# Add comment to issue
 add_issue_comment() {
   local issue_number="$1"
   local comment_body="$2"
   gh issue comment "$issue_number" --repo "$REPO" --body "$comment_body"
 }
 
-# issue を Project に追加
+# Add issue to Project
 add_issue_to_project() {
   local content_id="$1"
   local project_id
@@ -216,21 +216,21 @@ add_issue_to_project() {
     --jq '.data.addProjectV2ItemById.item.id'
 }
 
-# リポジトリのローカルパスを決定
+# Get local repo path
 get_repo_path() {
   if [[ -n "$LOCAL_REPO_PATH" && -d "$LOCAL_REPO_PATH" ]]; then
     echo "$LOCAL_REPO_PATH"
   else
     local repo_dir="$HOME/repos/$REPO_NAME"
     if [[ ! -d "$repo_dir" ]]; then
-      log_info "リポジトリをクローン中: $REPO → $repo_dir"
+      log_info "Cloning repository: $REPO -> $repo_dir"
       git clone "git@github.com:${REPO}.git" "$repo_dir"
     fi
     echo "$repo_dir"
   fi
 }
 
-# Claude を実行して出力を返す
+# Run Claude and return output
 run_claude() {
   local pane_title="$1"
   local prompt="$2"
@@ -244,15 +244,15 @@ run_claude() {
 
   echo "$prompt" > "$prompt_file"
 
-  log_info "🤖 ${pane_title} 開始"
+  log_info "Starting ${pane_title}"
   (cd "$work_dir" && cat "$prompt_file" | claude --allowedTools ${allowed_tools} 2>/dev/null > "$output_file")
-  log_info "🤖 ${pane_title} 完了"
+  log_info "Finished ${pane_title}"
 
   cat "$output_file" 2>/dev/null || echo ""
   rm -rf "$tmp_dir"
 }
 
-# ログ出力ヘルパー
+# Log helpers
 log() {
   local level="$1"
   shift
