@@ -22,13 +22,13 @@ get_linked_pr() {
 }
 
 while true; do
-  log_info "Checking for Review issues..." | tee -a "$LOG_FILE"
+  log_debug "Checking for Review issues..." >> "$LOG_FILE"
 
   items=$(get_items_by_status "$STATUS_REVIEW")
   count=$(echo "$items" | jq 'length')
 
   if [[ "$count" -eq 0 ]]; then
-    log_info "No issues in Review" | tee -a "$LOG_FILE"
+    log_debug "No issues in Review" >> "$LOG_FILE"
   else
     log_info "Found ${count} issue(s) in Review" | tee -a "$LOG_FILE"
 
@@ -115,10 +115,10 @@ ${claude_output}" 2>/dev/null || true
           ;;
       esac
 
-      log_info "Issue #${issue_number} processing complete" | tee -a "$LOG_FILE"
+      log_debug "Issue #${issue_number} processing complete" >> "$LOG_FILE"
     done
   fi
 
-  log_info "Next check in ${POLL_INTERVAL}s..." | tee -a "$LOG_FILE"
+  log_debug "Next check in ${POLL_INTERVAL}s..." >> "$LOG_FILE"
   sleep "$POLL_INTERVAL"
 done

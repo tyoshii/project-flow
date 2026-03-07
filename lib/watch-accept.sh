@@ -22,13 +22,13 @@ get_linked_pr() {
 }
 
 while true; do
-  log_info "Checking for Accept issues..." | tee -a "$LOG_FILE"
+  log_debug "Checking for Accept issues..." >> "$LOG_FILE"
 
   items=$(get_items_by_status "$STATUS_ACCEPT")
   count=$(echo "$items" | jq 'length')
 
   if [[ "$count" -eq 0 ]]; then
-    log_info "No issues in Accept" | tee -a "$LOG_FILE"
+    log_debug "No issues in Accept" >> "$LOG_FILE"
   else
     log_info "Found ${count} issue(s) in Accept" | tee -a "$LOG_FILE"
 
@@ -68,6 +68,6 @@ while true; do
     done
   fi
 
-  log_info "Next check in ${POLL_INTERVAL}s..." | tee -a "$LOG_FILE"
+  log_debug "Next check in ${POLL_INTERVAL}s..." >> "$LOG_FILE"
   sleep "$POLL_INTERVAL"
 done

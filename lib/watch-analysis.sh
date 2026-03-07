@@ -6,13 +6,13 @@ LOG_FILE="$LOG_DIR/analysis.log"
 log_info "Analysis watcher started" | tee -a "$LOG_FILE"
 
 while true; do
-  log_info "Checking for Analysis issues..." | tee -a "$LOG_FILE"
+  log_debug "Checking for Analysis issues..." >> "$LOG_FILE"
 
   items=$(get_items_by_status "$STATUS_ANALYSIS")
   count=$(echo "$items" | jq 'length')
 
   if [[ "$count" -eq 0 ]]; then
-    log_info "No issues in Analysis" | tee -a "$LOG_FILE"
+    log_debug "No issues in Analysis" >> "$LOG_FILE"
   else
     log_info "Found ${count} issue(s) in Analysis" | tee -a "$LOG_FILE"
 
@@ -152,10 +152,10 @@ ${claude_output}
           ;;
       esac
 
-      log_info "Issue #${issue_number} processing complete" | tee -a "$LOG_FILE"
+      log_debug "Issue #${issue_number} processing complete" >> "$LOG_FILE"
     done
   fi
 
-  log_info "Next check in ${POLL_INTERVAL}s..." | tee -a "$LOG_FILE"
+  log_debug "Next check in ${POLL_INTERVAL}s..." >> "$LOG_FILE"
   sleep "$POLL_INTERVAL"
 done
