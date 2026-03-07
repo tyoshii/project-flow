@@ -25,7 +25,7 @@ Backlog → Analysis → Dev → Review → QA → Accept → Done
 ## インストール
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/inuneko-okoku/project-flow/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tyoshii/project-flow/main/install.sh | bash
 ```
 
 ## 使い方

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${PROJECT_FLOW_INSTALL_DIR:-$HOME/.project-flow}"
-REPO_URL="https://github.com/inuneko-okoku/project-flow.git"
+REPO_URL="https://github.com/tyoshii/project-flow.git"
 
 echo "=== project-flow インストーラー ==="
 
