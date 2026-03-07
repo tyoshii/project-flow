@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/init.sh" "$1"
+source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
 
 LOG_FILE="$LOG_DIR/analysis.log"
 log_info "Analysis ウォッチャーを起動しました" | tee -a "$LOG_FILE"
