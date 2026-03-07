@@ -19,6 +19,7 @@ Commands:
   setup    カレントディレクトリ（リポルート）でセットアップ
   run      ポーラーを起動（tmux セッション）
   stop     ポーラーを停止
+  attach   tmux セッションにアタッチ
   status   実行中のプロジェクト一覧を表示
   logs     ログを表示
 
@@ -183,6 +184,20 @@ cmd_stop() {
   fi
 }
 
+cmd_attach() {
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config
+
+  local session_name="$TMUX_SESSION"
+
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    tmux attach-session -t "$session_name"
+  else
+    echo "セッション '$session_name' は実行されていません。先に project-flow run を実行してください。"
+    exit 1
+  fi
+}
+
 cmd_status() {
   echo "=== 実行中の project-flow セッション ==="
   tmux list-sessions 2>/dev/null | grep "^pf-" || echo "なし"
@@ -202,6 +217,7 @@ case "$command" in
   setup)   cmd_setup ;;
   run)     cmd_run ;;
   stop)    cmd_stop ;;
+  attach)  cmd_attach ;;
   status)  cmd_status ;;
   logs)    cmd_logs ;;
   -h|--help|help|"") usage ;;
