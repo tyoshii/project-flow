@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# project-flow — GitHub Project ベースの Claude 自動ワークフロー CLI
+set -euo pipefail
+
+PROJECT_FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat << 'EOF'
+Usage: project-flow <command> <owner/repo>
+
+Commands:
+  setup <owner/repo>   新規プロジェクトをセットアップ（GitHub Project 作成）
+  start <owner/repo>   ポーラーを起動（tmux セッション）
+  stop  <owner/repo>   ポーラーを停止
+  status               実行中のプロジェクト一覧を表示
+  logs <owner/repo>    ログを表示
+
+Workflow:
+  Backlog → Analysis → Dev → Review → QA → Accept → Done
+             (Claude)   (Claude)  (Claude)  (人間)   (自動)
+
+Examples:
+  project-flow setup myorg/myrepo
+  project-flow start myorg/myrepo
+  project-flow stop myorg/myrepo
+EOF
+}
+
+cmd_setup() {
+  local repo_arg="$1"
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config "$repo_arg"
+  source "$PROJECT_FLOW_DIR/lib/helpers.sh"
+
+  echo "=== project-flow セットアップ: ${REPO} ==="
+
+  if [[ -n "$PROJECT_NUMBER" ]]; then
+    echo "PROJECT_NUMBER が既に設定されています: $PROJECT_NUMBER"
+    read -p "新規に Project を作成しますか? (y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+      echo "セットアップを中止しました。"
+      exit 0
+    fi
+  fi
+
+  echo "GitHub Project を作成中..."
+  project_url=$(gh project create --owner "$OWNER" --title "${REPO_NAME} Dev Flow" --format json | jq -r '.url')
+  project_number=$(echo "$project_url" | grep -oE '[0-9]+$')
+
+  echo "Project 作成完了: $project_url (番号: $project_number)"
+
+  PROJECT_NUMBER="$project_number"
+  save_project_config
+
+  echo ""
+  echo "=== 次のステップ ==="
+  echo "以下の URL から Status フィールドを編集してください:"
+  echo "https://github.com/orgs/$OWNER/projects/$PROJECT_NUMBER/settings"
+  echo "(個人アカウントの場合: https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings)"
+  echo ""
+  echo "必要なステータスオプション:"
+  echo "  - Backlog"
+  echo "  - Analysis"
+  echo "  - Dev"
+  echo "  - Review"
+  echo "  - QA"
+  echo "  - Accept"
+  echo "  - Done"
+  echo ""
+  echo "設定完了後: project-flow start ${REPO}"
+}
+
+cmd_start() {
+  local repo_arg="$1"
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config "$repo_arg"
+
+  if [[ -z "$PROJECT_NUMBER" ]]; then
+    echo "ERROR: PROJECT_NUMBER が設定されていません。先に project-flow setup ${REPO} を実行してください。"
+    exit 1
+  fi
+
+  local session_name="$TMUX_SESSION"
+
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "既存の tmux セッション '$session_name' があります。"
+    read -p "既存セッションを終了して再起動しますか? (y/N): " confirm
+    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+      tmux kill-session -t "$session_name"
+    else
+      echo "既存セッションにアタッチします。"
+      tmux attach-session -t "$session_name"
+      exit 0
+    fi
+  fi
+
+  echo "=== project-flow を起動します ==="
+  echo "Project: ${REPO} (#${PROJECT_NUMBER})"
+  echo "ポーリング間隔: ${POLL_INTERVAL}秒"
+  echo ""
+
+  RESTART_CMD='while true; do bash %s %s || true; echo "[$(date +%%H:%%M:%%S)] クラッシュ検出。10秒後に再起動..."; sleep 10; done'
+
+  tmux new-session -d -s "$session_name" -n "main" \
+    "$(printf "$RESTART_CMD" "$PROJECT_FLOW_DIR/lib/watch-analysis.sh" "$repo_arg")"
+
+  tmux split-window -h -t "${session_name}:main" \
+    "$(printf "$RESTART_CMD" "$PROJECT_FLOW_DIR/lib/watch-dev.sh" "$repo_arg")"
+
+  tmux split-window -v -t "${session_name}:main.0" \
+    "$(printf "$RESTART_CMD" "$PROJECT_FLOW_DIR/lib/watch-review.sh" "$repo_arg")"
+
+  tmux split-window -v -t "${session_name}:main.1" \
+    "$(printf "$RESTART_CMD" "$PROJECT_FLOW_DIR/lib/watch-accept.sh" "$repo_arg")"
+
+  tmux set-option -t "$session_name" pane-border-status top
+  tmux set-option -t "$session_name" pane-border-format " #{pane_index}: #T "
+
+  tmux select-pane -t "${session_name}:main.0" -T "Analysis"
+  tmux select-pane -t "${session_name}:main.1" -T "Dev"
+  tmux select-pane -t "${session_name}:main.2" -T "Review"
+  tmux select-pane -t "${session_name}:main.3" -T "Accept"
+
+  echo "tmux セッション '$session_name' を作成しました。"
+  echo "  tmux attach -t $session_name"
+  echo ""
+
+  tmux attach-session -t "$session_name"
+}
+
+cmd_stop() {
+  local repo_arg="$1"
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config "$repo_arg"
+
+  local session_name="$TMUX_SESSION"
+
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    tmux kill-session -t "$session_name"
+    echo "セッション '$session_name' を終了しました。"
+  else
+    echo "セッション '$session_name' は実行されていません。"
+  fi
+}
+
+cmd_status() {
+  echo "=== 実行中の project-flow セッション ==="
+  tmux list-sessions 2>/dev/null | grep "^pf-" || echo "なし"
+}
+
+cmd_logs() {
+  local repo_arg="$1"
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config "$repo_arg"
+
+  tail -f "$LOG_DIR"/*.log 2>/dev/null || echo "ログファイルが見つかりません。"
+}
+
+# メインディスパッチ
+command="${1:-}"
+shift || true
+
+case "$command" in
+  setup)
+    [[ $# -lt 1 ]] && { echo "ERROR: owner/repo を指定してください"; exit 1; }
+    cmd_setup "$1"
+    ;;
+  start)
+    [[ $# -lt 1 ]] && { echo "ERROR: owner/repo を指定してください"; exit 1; }
+    cmd_start "$1"
+    ;;
+  stop)
+    [[ $# -lt 1 ]] && { echo "ERROR: owner/repo を指定してください"; exit 1; }
+    cmd_stop "$1"
+    ;;
+  status)
+    cmd_status
+    ;;
+  logs)
+    [[ $# -lt 1 ]] && { echo "ERROR: owner/repo を指定してください"; exit 1; }
+    cmd_logs "$1"
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    echo "ERROR: 不明なコマンド '$command'"
+    usage
+    exit 1
+    ;;
+esac
