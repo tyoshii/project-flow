@@ -2,7 +2,14 @@
 # project-flow — GitHub Project ベースの Claude 自動ワークフロー CLI
 set -euo pipefail
 
-PROJECT_FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+# シンボリックリンクを解決
+while [[ -L "$SCRIPT_PATH" ]]; do
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+PROJECT_FLOW_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
 
 usage() {
   cat << 'EOF'
