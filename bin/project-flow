@@ -17,12 +17,12 @@ Usage: project-flow <command>
 
 Commands:
   setup    Setup in current directory (repo root)
-  run      Start pollers (tmux session) [--debug]
+  run      Start pollers in background [--debug] [--attach]
   stop     Stop pollers
   attach   Attach to running tmux session
+  tail     Tail log output from running pollers
   update   Update project-flow to latest version
   status   Show running project-flow sessions
-  logs     Tail log files
 
 Workflow:
   Backlog → Analysis → Dev → Review → QA → Accept → Done
@@ -30,9 +30,12 @@ Workflow:
 
 Examples:
   cd ~/repos/my-project
-  project-flow setup     # Create .project-flow.conf & GitHub Project
-  project-flow run       # Start pollers
-  project-flow stop      # Stop pollers
+  project-flow setup          # Create .project-flow.conf & GitHub Project
+  project-flow run            # Start pollers (background)
+  project-flow run --attach   # Start and attach to tmux
+  project-flow tail           # Follow log output
+  project-flow attach         # Attach to tmux session
+  project-flow stop           # Stop pollers
 EOF
 }
 
@@ -124,21 +127,16 @@ cmd_run() {
   local session_name="$TMUX_SESSION"
 
   if tmux has-session -t "$session_name" 2>/dev/null; then
-    echo "Existing tmux session '$session_name' found."
-    read -p "Kill and restart? (y/N): " confirm
-    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-      tmux kill-session -t "$session_name"
-    else
-      echo "Attaching to existing session."
-      tmux attach-session -t "$session_name"
-      exit 0
-    fi
+    echo "Already running ($session_name)."
+    echo "  project-flow attach   # attach to tmux"
+    echo "  project-flow tail     # follow logs"
+    echo "  project-flow stop     # stop and restart"
+    exit 0
   fi
 
-  echo "=== Starting project-flow ==="
-  echo "Project: ${REPO} (#${PROJECT_NUMBER})"
-  echo "Poll interval: ${POLL_INTERVAL}s"
-  echo ""
+  echo "Starting project-flow..."
+  echo "  Project: ${REPO} (#${PROJECT_NUMBER})"
+  echo "  Poll interval: ${POLL_INTERVAL}s"
 
   # Pass config file path and debug flag to each watcher via env var
   local conf_path="$PROJECT_CONF_FILE"
@@ -165,11 +163,17 @@ cmd_run() {
   tmux select-pane -t "${session_name}:main.2" -T "Review"
   tmux select-pane -t "${session_name}:main.3" -T "Accept"
 
-  echo "Created tmux session '$session_name'."
-  echo "  tmux attach -t $session_name"
+  echo "Started ($session_name)."
   echo ""
+  echo "  project-flow attach   # attach to tmux"
+  echo "  project-flow tail     # follow logs"
+  echo "  project-flow stop     # stop pollers"
 
-  tmux attach-session -t "$session_name"
+  # If --attach flag, attach immediately
+  if [[ "${OPT_ATTACH:-}" == "1" ]]; then
+    echo ""
+    tmux attach-session -t "$session_name"
+  fi
 }
 
 cmd_stop() {
@@ -195,9 +199,23 @@ cmd_attach() {
   if tmux has-session -t "$session_name" 2>/dev/null; then
     tmux attach-session -t "$session_name"
   else
-    echo "Session '$session_name' is not running. Run project-flow run first."
+    echo "Not running. Start with: project-flow run"
     exit 1
   fi
+}
+
+cmd_tail() {
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config
+
+  local session_name="$TMUX_SESSION"
+
+  if ! tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "Not running. Start with: project-flow run"
+    exit 1
+  fi
+
+  tail -f "$LOG_DIR"/*.log 2>/dev/null || echo "No log files found."
 }
 
 cmd_update() {
@@ -225,13 +243,6 @@ cmd_status() {
   tmux list-sessions 2>/dev/null | grep "^pf-" || echo "None"
 }
 
-cmd_logs() {
-  source "$PROJECT_FLOW_DIR/lib/config.sh"
-  load_project_config
-
-  tail -f "$LOG_DIR"/*.log 2>/dev/null || echo "No log files found."
-}
-
 # Main dispatch
 command="${1:-}"
 shift || true
@@ -240,6 +251,7 @@ shift || true
 for arg in "$@"; do
   case "$arg" in
     --debug) export PROJECT_FLOW_DEBUG=1 ;;
+    --attach) OPT_ATTACH=1 ;;
   esac
 done
 
@@ -248,9 +260,9 @@ case "$command" in
   run)     cmd_run ;;
   stop)    cmd_stop ;;
   attach)  cmd_attach ;;
+  tail)    cmd_tail ;;
   update)  cmd_update ;;
   status)  cmd_status ;;
-  logs)    cmd_logs ;;
   -h|--help|help|"") usage ;;
   *)
     echo "ERROR: Unknown command '$command'"
