@@ -31,19 +31,15 @@ curl -fsSL https://raw.githubusercontent.com/tyoshii/project-flow/main/install.s
 ## Usage
 
 ```
-Usage: project-flow <command>
-
 Commands:
-  setup    Setup in current directory (repo root)
-  run      Start pollers (tmux session)
-  stop     Stop pollers
-  attach   Attach to running tmux session
-  status   Show running project-flow sessions
-  logs     Tail log files
-
-Workflow:
-  Backlog → Analysis → Dev → Review → QA → Accept → Done
-             (Claude)   (Claude)  (Claude)  (Human)  (Auto)
+  setup      Setup in current directory (repo root)
+  start      Start pollers in background [--debug] [--attach]
+  stop       Stop pollers
+  restart    Restart pollers [--debug] [--attach]
+  attach     Attach to running tmux session
+  tail       Tail log output from running pollers
+  status     Show running project-flow sessions
+  update     Update project-flow to latest version
 ```
 
 ### Quick Start
@@ -57,7 +53,7 @@ project-flow setup
 #    Backlog, Analysis, Dev, Review, QA, Accept, Done
 
 # 3. Start pollers
-project-flow run
+project-flow start
 
 # 4. Add issues to the Project board and move to Analysis
 #    → Claude handles the rest automatically
@@ -66,10 +62,13 @@ project-flow run
 ### Commands
 
 ```bash
-project-flow setup     # Create .project-flow.conf & GitHub Project
-project-flow run       # Start tmux session with all pollers
-project-flow attach    # Attach to running tmux session
-project-flow stop      # Stop tmux session
-project-flow status    # List running project-flow sessions
-project-flow logs      # Tail log files
+project-flow setup            # Create .project-flow.conf & GitHub Project
+project-flow start            # Start pollers (background)
+project-flow start --attach   # Start and attach to tmux
+project-flow stop             # Stop pollers
+project-flow restart          # Stop and start again
+project-flow attach           # Attach to tmux session
+project-flow tail             # Follow log output
+project-flow status           # List running sessions
+project-flow update           # Pull latest version
 ```

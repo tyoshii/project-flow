@@ -16,13 +16,14 @@ usage() {
 Usage: project-flow <command>
 
 Commands:
-  setup    Setup in current directory (repo root)
-  run      Start pollers in background [--debug] [--attach]
-  stop     Stop pollers
-  attach   Attach to running tmux session
-  tail     Tail log output from running pollers
-  update   Update project-flow to latest version
-  status   Show running project-flow sessions
+  setup      Setup in current directory (repo root)
+  start      Start pollers in background [--debug] [--attach]
+  stop       Stop pollers
+  restart    Restart pollers [--debug] [--attach]
+  attach     Attach to running tmux session
+  tail       Tail log output from running pollers
+  status     Show running project-flow sessions
+  update     Update project-flow to latest version
 
 Workflow:
   Backlog → Analysis → Dev → Review → QA → Accept → Done
@@ -30,12 +31,13 @@ Workflow:
 
 Examples:
   cd ~/repos/my-project
-  project-flow setup          # Create .project-flow.conf & GitHub Project
-  project-flow run            # Start pollers (background)
-  project-flow run --attach   # Start and attach to tmux
-  project-flow tail           # Follow log output
-  project-flow attach         # Attach to tmux session
-  project-flow stop           # Stop pollers
+  project-flow setup            # Create .project-flow.conf & GitHub Project
+  project-flow start            # Start pollers (background)
+  project-flow start --attach   # Start and attach to tmux
+  project-flow tail             # Follow log output
+  project-flow attach           # Attach to tmux session
+  project-flow restart          # Stop and start again
+  project-flow stop             # Stop pollers
 EOF
 }
 
@@ -112,10 +114,10 @@ EOF
   echo "   Required statuses: Backlog, Analysis, Dev, Review, QA, Accept, Done"
   echo ""
   echo "2. Start pollers:"
-  echo "   project-flow run"
+  echo "   project-flow start"
 }
 
-cmd_run() {
+cmd_start() {
   source "$PROJECT_FLOW_DIR/lib/config.sh"
   load_project_config
 
@@ -128,9 +130,9 @@ cmd_run() {
 
   if tmux has-session -t "$session_name" 2>/dev/null; then
     echo "Already running ($session_name)."
-    echo "  project-flow attach   # attach to tmux"
-    echo "  project-flow tail     # follow logs"
-    echo "  project-flow stop     # stop and restart"
+    echo "  project-flow attach    # attach to tmux"
+    echo "  project-flow tail      # follow logs"
+    echo "  project-flow restart   # stop and start again"
     exit 0
   fi
 
@@ -180,10 +182,24 @@ cmd_stop() {
 
   if tmux has-session -t "$session_name" 2>/dev/null; then
     tmux kill-session -t "$session_name"
-    echo "Session '$session_name' stopped."
+    echo "Stopped ($session_name)."
   else
-    echo "Session '$session_name' is not running."
+    echo "Not running."
   fi
+}
+
+cmd_restart() {
+  source "$PROJECT_FLOW_DIR/lib/config.sh"
+  load_project_config
+
+  local session_name="$TMUX_SESSION"
+
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    tmux kill-session -t "$session_name"
+    echo "Stopped ($session_name)."
+  fi
+
+  cmd_start
 }
 
 cmd_attach() {
@@ -195,7 +211,7 @@ cmd_attach() {
   if tmux has-session -t "$session_name" 2>/dev/null; then
     tmux attach-session -t "$session_name"
   else
-    echo "Not running. Start with: project-flow run"
+    echo "Not running. Start with: project-flow start"
     exit 1
   fi
 }
@@ -207,7 +223,7 @@ cmd_tail() {
   local session_name="$TMUX_SESSION"
 
   if ! tmux has-session -t "$session_name" 2>/dev/null; then
-    echo "Not running. Start with: project-flow run"
+    echo "Not running. Start with: project-flow start"
     exit 1
   fi
 
@@ -253,8 +269,9 @@ done
 
 case "$command" in
   setup)   cmd_setup ;;
-  run)     cmd_run ;;
+  start)   cmd_start ;;
   stop)    cmd_stop ;;
+  restart) cmd_restart ;;
   attach)  cmd_attach ;;
   tail)    cmd_tail ;;
   update)  cmd_update ;;
