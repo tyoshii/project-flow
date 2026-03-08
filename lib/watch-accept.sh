@@ -51,7 +51,7 @@ while true; do
             log_info "PR #${pr_number} merged successfully" | tee -a "$LOG_FILE"
           else
             log_error "Failed to merge PR #${pr_number}" | tee -a "$LOG_FILE"
-            add_issue_comment "$issue_number" "🤖 Accept: Failed to merge PR #${pr_number}. Please check manually."
+            add_issue_comment "$issue_number" "🤖 Accept: $(printf "$(msg "accept.merge_failed")" "$pr_number")"
             continue
           fi
         else
@@ -63,7 +63,7 @@ while true; do
 
       gh issue close "$issue_number" --repo "$REPO" 2>>"$LOG_FILE" || true
       move_item_to_status "$item_id" "$STATUS_DONE"
-      add_issue_comment "$issue_number" "🤖 Accept: PR merged & issue closed."
+      add_issue_comment "$issue_number" "🤖 Accept: $(msg "accept.done")"
       log_info "Issue #${issue_number} -> Done" | tee -a "$LOG_FILE"
     done
   fi

@@ -274,3 +274,77 @@ log_debug() {
     log "DEBUG" "$@"
   fi
 }
+
+# Summarize Claude output for failure comments
+# Uses Claude to analyze the output and explain what happened in the configured language
+summarize_failure() {
+  local claude_output="$1"
+  local context="$2"  # e.g. "PR creation", "implementation"
+  local lang="${LANGUAGE:-en}"
+
+  local raw_tail
+  raw_tail=$(echo "$claude_output" | tail -30 | head -c 2000)
+
+  local summary
+  summary=$(echo "以下はClaude Codeの出力です。この出力を分析して、なぜ${context}が失敗したのかを${lang}で簡潔に説明してください（3-5行程度）。技術的な原因と、次に何をすべきかを含めてください。
+
+---
+${raw_tail}" | claude -p 2>/dev/null || echo "")
+
+  if [[ -z "$summary" ]]; then
+    summary="(auto-summary unavailable)"
+  fi
+
+  echo "$summary"
+}
+
+# Get localized message
+# Usage: msg "key"
+# Messages are kept simple — the key itself is English, the function returns localized text
+msg() {
+  local key="$1"
+  local lang="${LANGUAGE:-en}"
+
+  case "$lang" in
+    ja)
+      case "$key" in
+        "dev.success")          echo "実装完了 — PR %s を作成しました。Review に移動します。" ;;
+        "dev.failed_execution") echo "実装失敗 — Claude 実行中にエラーが発生しました。Backlog に戻します。" ;;
+        "dev.failed_pr")        echo "PR を作成できませんでした。Backlog に戻します。" ;;
+        "dev.failure_summary")  echo "失敗の原因" ;;
+        "dev.claude_output")    echo "Claude 出力（末尾30行）" ;;
+        "review.no_pr")         echo "リンクされた PR が見つかりません。Dev に戻します。" ;;
+        "review.lgtm")          echo "LGTM — QA に移動します。PR #%s をご確認ください。" ;;
+        "review.changes")       echo "PR #%s に変更をリクエストしました。Dev に戻します。" ;;
+        "accept.merge_failed")  echo "PR #%s のマージに失敗しました。手動で確認してください。" ;;
+        "accept.done")          echo "PR をマージし、Issue をクローズしました。" ;;
+        "analysis.questions")   echo "自動分析に質問があります。回答後、Analysis に戻してください。" ;;
+        "analysis.split")       echo "サブ Issue を作成し、Backlog に追加しました:" ;;
+        "analysis.split_move")  echo "元の Issue を Backlog に戻します。" ;;
+        "analysis.ready")       echo "分析完了。Dev に移動します。" ;;
+        "analysis.skip_qa")     echo "実装済みです。Dev/Review をスキップして QA に移動します。" ;;
+        *) echo "$key" ;;
+      esac
+      ;;
+    *)
+      case "$key" in
+        "dev.success")          echo "Implementation complete — PR %s created. Moving to Review." ;;
+        "dev.failed_execution") echo "Implementation failed — error during Claude execution. Moving back to Backlog." ;;
+        "dev.failed_pr")        echo "Could not create PR. Moving back to Backlog." ;;
+        "dev.failure_summary")  echo "Failure reason" ;;
+        "dev.claude_output")    echo "Claude output (last 30 lines)" ;;
+        "review.no_pr")         echo "No linked PR found. Moving back to Dev." ;;
+        "review.lgtm")          echo "LGTM — moving to QA. Please review PR #%s." ;;
+        "review.changes")       echo "Changes requested on PR #%s. Moving back to Dev." ;;
+        "accept.merge_failed")  echo "Failed to merge PR #%s. Please check manually." ;;
+        "accept.done")          echo "PR merged & issue closed." ;;
+        "analysis.questions")   echo "Automated analysis has questions. Please answer and move back to Analysis." ;;
+        "analysis.split")       echo "Created sub-issues and added to Backlog:" ;;
+        "analysis.split_move")  echo "Moving original issue back to Backlog." ;;
+        "analysis.ready")       echo "Analysis complete. Moving to Dev." ;;
+        "analysis.skip_qa")     echo "Implementation already complete. Skipping Dev/Review, moving to QA." ;;
+        *) echo "$key" ;;
+      esac
+      ;;
+  esac
+}

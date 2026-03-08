@@ -43,7 +43,7 @@ while true; do
 
       if [[ -z "$pr_url" ]]; then
         log_warn "Issue #${issue_number}: No linked PR found -> moving back to Dev" | tee -a "$LOG_FILE"
-        add_issue_comment "$issue_number" "🤖 Review: No linked PR found. Moving back to Dev."
+        add_issue_comment "$issue_number" "🤖 Review: $(msg "review.no_pr")"
         move_item_to_status "$item_id" "$STATUS_DEV"
         continue
       fi
@@ -101,7 +101,7 @@ ${comments}
           gh pr review "$pr_number" --repo "$REPO" --approve --body "🤖 Auto-review: LGTM
 
 ${claude_output}" 2>/dev/null || true
-          add_issue_comment "$issue_number" "🤖 Review: LGTM — moving to QA. Please review PR #${pr_number}."
+          add_issue_comment "$issue_number" "🤖 Review: $(printf "$(msg "review.lgtm")" "$pr_number")"
           move_item_to_status "$item_id" "$STATUS_QA"
           ;;
 
@@ -110,7 +110,7 @@ ${claude_output}" 2>/dev/null || true
           gh pr review "$pr_number" --repo "$REPO" --request-changes --body "🤖 Auto-review: Changes Requested
 
 ${claude_output}" 2>/dev/null || true
-          add_issue_comment "$issue_number" "🤖 Review: Changes requested on PR #${pr_number}. Moving back to Dev."
+          add_issue_comment "$issue_number" "🤖 Review: $(printf "$(msg "review.changes")" "$pr_number")"
           move_item_to_status "$item_id" "$STATUS_DEV"
           ;;
       esac

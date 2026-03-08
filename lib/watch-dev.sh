@@ -61,9 +61,13 @@ ${comments}
         "$branch_name") || {
         log_error "Claude execution failed for issue #${issue_number}" | tee -a "$LOG_FILE"
         reason=$(echo "$claude_output" | tail -30 | head -c 2000)
-        comment_body="🤖 Dev: Implementation failed — error during Claude execution. Moving back to Backlog.
+        summary=$(summarize_failure "$claude_output" "implementation")
+        comment_body="🤖 Dev: $(msg "dev.failed_execution")
 
-<details><summary>Claude output (last 30 lines)</summary>
+### $(msg "dev.failure_summary")
+${summary}
+
+<details><summary>$(msg "dev.claude_output")</summary>
 
 \`\`\`
 ${reason}
@@ -82,15 +86,19 @@ ${reason}
 
       if [[ -n "$pr_url" ]]; then
         log_info "Issue #${issue_number}: PR created -> moving to Review ($pr_url)" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: Implementation complete — PR ${pr_url} created. Moving to Review."
+        comment_body="🤖 Dev: $(printf "$(msg "dev.success")" "$pr_url")"
         add_issue_comment "$issue_number" "$comment_body"
         move_item_to_status "$item_id" "$STATUS_REVIEW"
       else
         log_warn "Issue #${issue_number}: No PR URL found -> moving back to Backlog" | tee -a "$LOG_FILE"
         reason=$(echo "$claude_output" | tail -30 | head -c 2000)
-        comment_body="🤖 Dev: Could not create PR. Moving back to Backlog.
+        summary=$(summarize_failure "$claude_output" "PR creation")
+        comment_body="🤖 Dev: $(msg "dev.failed_pr")
 
-<details><summary>Claude output (last 30 lines)</summary>
+### $(msg "dev.failure_summary")
+${summary}
+
+<details><summary>$(msg "dev.claude_output")</summary>
 
 \`\`\`
 ${reason}

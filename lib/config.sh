@@ -48,6 +48,7 @@ load_project_config() {
   STATUS_DONE="Done"
   POLL_INTERVAL=60
   LOCAL_REPO_PATH=""
+  LANGUAGE="en"
 
   # Source config file
   source "$conf_file"

@@ -96,7 +96,7 @@ ${comments}
 ${claude_output}
 
 ---
-*Automated analysis has questions. Please answer and move back to Analysis.*"
+*$(msg "analysis.questions")*"
           add_issue_comment "$issue_number" "$comment_body"
           move_item_to_status "$item_id" "$STATUS_BACKLOG"
           ;;
@@ -159,11 +159,11 @@ ${sub_body}"
 
           comment_body="## 🤖 Analysis: Task Split
 
-Created sub-issues and added to Backlog:
+$(msg "analysis.split")
 ${created_issues}
 
 ---
-*Moving original issue back to Backlog.*"
+*$(msg "analysis.split_move")*"
           add_issue_comment "$issue_number" "$comment_body"
           move_item_to_status "$item_id" "$STATUS_BACKLOG"
           ;;
@@ -175,7 +175,7 @@ ${created_issues}
 ${claude_output}
 
 ---
-*Analysis complete. Moving to Dev.*"
+*$(msg "analysis.ready")*"
           add_issue_comment "$issue_number" "$comment_body"
           move_item_to_status "$item_id" "$STATUS_DEV"
           ;;
@@ -187,7 +187,7 @@ ${claude_output}
 ${claude_output}
 
 ---
-*Implementation already complete. Skipping Dev/Review, moving to QA.*"
+*$(msg "analysis.skip_qa")*"
           add_issue_comment "$issue_number" "$comment_body"
           move_item_to_status "$item_id" "$STATUS_QA"
           ;;
