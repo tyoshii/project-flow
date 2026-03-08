@@ -77,11 +77,18 @@ cmd_setup() {
   echo "Repository: ${repo_slug}"
   echo ""
 
-  echo "Creating GitHub Project..."
-  project_url=$(gh project create --owner "$owner" --title "${repo_name} Dev Flow" --format json | jq -r '.url')
-  project_number=$(echo "$project_url" | grep -oE '[0-9]+$')
+  local project_number
+  read -p "Existing GitHub Project number? (leave empty to create new): " project_number
 
-  echo "Project created: $project_url (#$project_number)"
+  if [[ -n "$project_number" ]]; then
+    echo "Using existing Project #${project_number}"
+  else
+    echo "Creating GitHub Project..."
+    local project_url
+    project_url=$(gh project create --owner "$owner" --title "${repo_name} Dev Flow" --format json | jq -r '.url')
+    project_number=$(echo "$project_url" | grep -oE '[0-9]+$')
+    echo "Project created: $project_url (#$project_number)"
+  fi
 
   # Create .project-flow.conf
   cat > ".project-flow.conf" << EOF
