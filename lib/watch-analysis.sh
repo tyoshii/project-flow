@@ -5,6 +5,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
 LOG_FILE="$LOG_DIR/analysis.log"
 log_info "Analysis watcher started" | tee -a "$LOG_FILE"
 
+get_linked_pr() {
+  local issue_number="$1"
+  local pr_url
+  pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/comments" \
+    --jq '.[].body' 2>/dev/null \
+    | grep -oE 'https://github.com/[^/]+/[^/]+/pull/[0-9]+' \
+    | tail -1 || echo "")
+
+  if [[ -z "$pr_url" ]]; then
+    pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/timeline" \
+      --jq '.[] | select(.event == "cross-referenced") | .source.issue.pull_request.html_url // empty' \
+      2>/dev/null | tail -1 || echo "")
+  fi
+  echo "$pr_url"
+}
+
 while true; do
   log_debug "Checking for Analysis issues..." >> "$LOG_FILE"
 
@@ -29,6 +45,18 @@ while true; do
       labels=$(echo "$details" | jq -r '[.labels.nodes[].name] | join(", ")')
       comments=$(echo "$details" | jq -r '.comments.nodes[] | "[\(.author.login) at \(.createdAt)]: \(.body)"' 2>/dev/null || echo "")
 
+      # Gather linked PR info
+      pr_url=$(get_linked_pr "$issue_number")
+      pr_context=""
+      if [[ -n "$pr_url" ]]; then
+        pr_number=$(echo "$pr_url" | grep -oE '[0-9]+$')
+        pr_state=$(gh pr view "$pr_number" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+        pr_context="## Linked PR
+- URL: ${pr_url}
+- State: ${pr_state}
+"
+      fi
+
       prompt="$(cat "$PROMPTS_DIR/analysis.md")
 
 ## Issue #${issue_number}
@@ -38,7 +66,8 @@ ${body}
 
 Labels: ${labels}
 
-Comments:
+${pr_context}
+## Comments (chronological):
 ${comments}
 "
 
@@ -57,7 +86,7 @@ ${comments}
       log_info "Claude output for issue #${issue_number}:" >> "$LOG_FILE"
       echo "$claude_output" >> "$LOG_FILE"
 
-      action=$(echo "$claude_output" | grep -oE '\[(QUESTIONS|SPLIT|READY)\]' | head -1 || echo "[READY]")
+      action=$(echo "$claude_output" | grep -oE '\[(QUESTIONS|SPLIT|READY|SKIP_TO_QA)\]' | head -1 || echo "[READY]")
 
       case "$action" in
         "[QUESTIONS]")
@@ -149,6 +178,18 @@ ${claude_output}
 *Analysis complete. Moving to Dev.*"
           add_issue_comment "$issue_number" "$comment_body"
           move_item_to_status "$item_id" "$STATUS_DEV"
+          ;;
+
+        "[SKIP_TO_QA]")
+          log_info "Issue #${issue_number}: Already resolved -> skipping to QA" | tee -a "$LOG_FILE"
+          comment_body="## 🤖 Analysis: Skipping to QA
+
+${claude_output}
+
+---
+*Implementation already complete. Skipping Dev/Review, moving to QA.*"
+          add_issue_comment "$issue_number" "$comment_body"
+          move_item_to_status "$item_id" "$STATUS_QA"
           ;;
       esac
 
