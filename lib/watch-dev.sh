@@ -47,18 +47,18 @@ ${comments}
 
 ## Repository Info
 - Repo: ${REPO}
-- Local path: ${repo_path}
 - Branch name to use: ${branch_name}
 - Base branch: main
 "
 
-      log_info "Running Claude for issue #${issue_number}..." | tee -a "$LOG_FILE"
+      log_info "Running Claude for issue #${issue_number} (worktree: ${branch_name})..." | tee -a "$LOG_FILE"
 
       claude_output=$(run_claude \
         "Dev #${issue_number}" \
         "$prompt" \
         '"Bash" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" "WebFetch"' \
-        "$repo_path") || {
+        "$repo_path" \
+        "$branch_name") || {
         log_error "Claude execution failed for issue #${issue_number}" | tee -a "$LOG_FILE"
         reason=$(echo "$claude_output" | tail -30 | head -c 2000)
         comment_body="🤖 Dev: Implementation failed — error during Claude execution. Moving back to Backlog.
@@ -87,7 +87,6 @@ ${reason}
         move_item_to_status "$item_id" "$STATUS_REVIEW"
       else
         log_warn "Issue #${issue_number}: No PR URL found -> moving back to Backlog" | tee -a "$LOG_FILE"
-        # Extract last 30 lines of Claude output as reason context
         reason=$(echo "$claude_output" | tail -30 | head -c 2000)
         comment_body="🤖 Dev: Could not create PR. Moving back to Backlog.
 

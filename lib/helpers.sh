@@ -231,11 +231,13 @@ get_repo_path() {
 }
 
 # Run Claude and return output
+# Usage: run_claude <pane_title> <prompt> <allowed_tools> <work_dir> [worktree_name]
 run_claude() {
   local pane_title="$1"
   local prompt="$2"
   local allowed_tools="$3"
   local work_dir="$4"
+  local worktree_name="${5:-}"
 
   local tmp_dir
   tmp_dir=$(mktemp -d)
@@ -244,8 +246,13 @@ run_claude() {
 
   echo "$prompt" > "$prompt_file"
 
+  local worktree_flag=""
+  if [[ -n "$worktree_name" ]]; then
+    worktree_flag="--worktree $worktree_name"
+  fi
+
   log_info "Starting ${pane_title}"
-  (cd "$work_dir" && cat "$prompt_file" | claude --allowedTools ${allowed_tools} 2>/dev/null > "$output_file")
+  (cd "$work_dir" && cat "$prompt_file" | claude --allowedTools ${allowed_tools} ${worktree_flag} 2>/dev/null > "$output_file")
   log_info "Finished ${pane_title}"
 
   cat "$output_file" 2>/dev/null || echo ""
