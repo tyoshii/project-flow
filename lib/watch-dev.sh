@@ -60,9 +60,18 @@ ${comments}
         '"Bash" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" "WebFetch"' \
         "$repo_path") || {
         log_error "Claude execution failed for issue #${issue_number}" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: Implementation failed — error during Claude execution."
+        reason=$(echo "$claude_output" | tail -30 | head -c 2000)
+        comment_body="🤖 Dev: Implementation failed — error during Claude execution. Moving back to Backlog.
+
+<details><summary>Claude output (last 30 lines)</summary>
+
+\`\`\`
+${reason}
+\`\`\`
+
+</details>"
         add_issue_comment "$issue_number" "$comment_body"
-        move_item_to_status "$item_id" "$STATUS_ANALYSIS"
+        move_item_to_status "$item_id" "$STATUS_BACKLOG"
         continue
       }
 
@@ -77,10 +86,20 @@ ${comments}
         add_issue_comment "$issue_number" "$comment_body"
         move_item_to_status "$item_id" "$STATUS_REVIEW"
       else
-        log_warn "Issue #${issue_number}: No PR URL found -> moving back to Analysis" | tee -a "$LOG_FILE"
-        comment_body="🤖 Dev: Could not create PR. Moving back to Analysis."
+        log_warn "Issue #${issue_number}: No PR URL found -> moving back to Backlog" | tee -a "$LOG_FILE"
+        # Extract last 30 lines of Claude output as reason context
+        reason=$(echo "$claude_output" | tail -30 | head -c 2000)
+        comment_body="🤖 Dev: Could not create PR. Moving back to Backlog.
+
+<details><summary>Claude output (last 30 lines)</summary>
+
+\`\`\`
+${reason}
+\`\`\`
+
+</details>"
         add_issue_comment "$issue_number" "$comment_body"
-        move_item_to_status "$item_id" "$STATUS_ANALYSIS"
+        move_item_to_status "$item_id" "$STATUS_BACKLOG"
       fi
 
       log_debug "Issue #${issue_number} processing complete" >> "$LOG_FILE"
