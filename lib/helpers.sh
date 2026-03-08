@@ -252,7 +252,7 @@ run_claude() {
   fi
 
   log_info "Starting ${pane_title}"
-  (cd "$work_dir" && claude -p --allowedTools ${allowed_tools} ${worktree_flag} < "$prompt_file" 2>/dev/null > "$output_file")
+  (cd "$work_dir" && claude -p --dangerously-skip-permissions --allowedTools ${allowed_tools} ${worktree_flag} < "$prompt_file" 2>/dev/null > "$output_file")
   log_info "Finished ${pane_title}"
 
   cat "$output_file" 2>/dev/null || echo ""
