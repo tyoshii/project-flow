@@ -37,6 +37,11 @@ while true; do
       issue_number=$(echo "$item" | jq -r '.number')
       issue_title=$(echo "$item" | jq -r '.title')
 
+      # ループ検出: Analysis の試行回数チェック
+      if check_retry_limit "$issue_number" "$item_id" "Analysis"; then
+        continue
+      fi
+
       log_info "Analyzing issue #${issue_number} (${issue_title})..." | tee -a "$LOG_FILE"
 
       details=$(get_issue_details "$issue_number")

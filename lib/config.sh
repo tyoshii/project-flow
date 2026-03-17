@@ -49,6 +49,7 @@ load_project_config() {
   POLL_INTERVAL=60
   LOCAL_REPO_PATH=""
   LANGUAGE="en"
+  MAX_RETRIES=3
 
   # Source config file
   source "$conf_file"

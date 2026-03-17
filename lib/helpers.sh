@@ -298,6 +298,45 @@ ${raw_tail}" | claude -p 2>/dev/null || echo "")
   echo "$summary"
 }
 
+# Count how many times a phase has processed this issue
+# Usage: count_phase_attempts <issue_number> <phase>
+# Counts comments matching "🤖 <Phase>:" pattern
+count_phase_attempts() {
+  local issue_number="$1"
+  local phase="$2"
+
+  gh api "repos/${REPO}/issues/${issue_number}/comments" \
+    --jq "[.[] | select(.body | startswith(\"🤖 ${phase}:\") or startswith(\"## 🤖 ${phase}:\"))] | length" \
+    2>/dev/null || echo "0"
+}
+
+# Check if issue has exceeded retry limit for a phase
+# Returns 0 (true) if over limit, 1 (false) if OK
+check_retry_limit() {
+  local issue_number="$1"
+  local item_id="$2"
+  local phase="$3"
+  local max_retries="${MAX_RETRIES:-3}"
+
+  local attempts
+  attempts=$(count_phase_attempts "$issue_number" "$phase")
+
+  if [[ "$attempts" -ge "$max_retries" ]]; then
+    log_warn "Issue #${issue_number}: ${phase} attempted ${attempts} times (limit: ${max_retries}). Escalating." | tee -a "$LOG_FILE"
+    local comment_body
+    comment_body="$(printf "$(msg "loop.detected")" "$phase" "$attempts")
+
+$(msg "loop.history")
+$(gh api "repos/${REPO}/issues/${issue_number}/comments" \
+  --jq "[.[] | select(.body | startswith(\"🤖\")) | \"- \" + (.body | split(\"\n\") | .[0])] | join(\"\n\")" 2>/dev/null || echo "")"
+    add_issue_comment "$issue_number" "$comment_body"
+    move_item_to_status "$item_id" "$STATUS_BACKLOG"
+    return 0
+  fi
+
+  return 1
+}
+
 # Get localized message
 # Usage: msg "key"
 # Messages are kept simple — the key itself is English, the function returns localized text
@@ -323,6 +362,8 @@ msg() {
         "analysis.split_move")  echo "元の Issue を Backlog に戻します。" ;;
         "analysis.ready")       echo "分析完了。Dev に移動します。" ;;
         "analysis.skip_qa")     echo "実装済みです。Dev/Review をスキップして QA に移動します。" ;;
+        "loop.detected")        echo "🔁 **ループ検出**: %s フェーズが %s 回実行されました。自動処理を停止し、Backlog に戻します。人間の確認が必要です。" ;;
+        "loop.history")         echo "### 自動処理の履歴" ;;
         *) echo "$key" ;;
       esac
       ;;
@@ -343,6 +384,8 @@ msg() {
         "analysis.split_move")  echo "Moving original issue back to Backlog." ;;
         "analysis.ready")       echo "Analysis complete. Moving to Dev." ;;
         "analysis.skip_qa")     echo "Implementation already complete. Skipping Dev/Review, moving to QA." ;;
+        "loop.detected")        echo "🔁 **Loop detected**: %s phase has run %s times. Stopping automation and moving to Backlog. Human intervention required." ;;
+        "loop.history")         echo "### Automation history" ;;
         *) echo "$key" ;;
       esac
       ;;
