@@ -14,6 +14,5 @@
 
 ## コミットしてはいけないファイル
 
-- `.project-flow.conf` — リポジトリ固有の設定（ユーザーが setup で生成）
-- `.project-flow-logs/` — ランタイムログ
+- `.project-flow/logs/` — ランタイムログ（.gitignore で除外済み）
 - `.env`, シークレットファイル

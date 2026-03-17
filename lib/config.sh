@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 # config.sh — Load project configuration
 #
-# Reads .project-flow.conf from current directory (or parent directories)
+# Reads .project-flow/config from current directory (or parent directories)
 
 set -euo pipefail
 
 PROJECT_FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Find .project-flow.conf by traversing up from PWD
+# Find .project-flow/config by traversing up from PWD
+# Also checks legacy .project-flow.conf for backwards compatibility
 find_config() {
   local dir="$PWD"
   while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/.project-flow/config" ]]; then
+      echo "$dir/.project-flow/config"
+      return
+    fi
     if [[ -f "$dir/.project-flow.conf" ]]; then
       echo "$dir/.project-flow.conf"
       return
@@ -26,11 +31,16 @@ load_project_config() {
   conf_file=$(find_config)
 
   if [[ -z "$conf_file" ]]; then
-    echo "ERROR: .project-flow.conf not found. Run project-flow setup first." >&2
+    echo "ERROR: .project-flow/config not found. Run project-flow setup first." >&2
     return 1
   fi
 
-  PROJECT_ROOT="$(dirname "$conf_file")"
+  # PROJECT_ROOT is the repo root (parent of .project-flow/ dir, or dir of legacy .conf)
+  if [[ "$conf_file" == *"/.project-flow/config" ]]; then
+    PROJECT_ROOT="$(dirname "$(dirname "$conf_file")")"
+  else
+    PROJECT_ROOT="$(dirname "$conf_file")"
+  fi
   PROJECT_CONF_FILE="$conf_file"
 
   # Defaults
@@ -61,7 +71,7 @@ load_project_config() {
 
   # Derived paths
   local safe_name="${OWNER}__${REPO_NAME}"
-  LOG_DIR="${PROJECT_ROOT}/.project-flow-logs"
+  LOG_DIR="${PROJECT_ROOT}/.project-flow/logs"
   PROMPTS_DIR="${PROJECT_FLOW_DIR}/prompts"
   TMUX_SESSION="pf-${safe_name}"
 

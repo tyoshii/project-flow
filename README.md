@@ -45,7 +45,7 @@ Commands:
 ### Quick Start
 
 ```bash
-# 1. Setup (creates GitHub Project & .project-flow.conf)
+# 1. Setup (creates GitHub Project & .project-flow/config)
 cd ~/repos/my-project
 project-flow setup
 
@@ -62,7 +62,7 @@ project-flow start
 ### Commands
 
 ```bash
-project-flow setup            # Create .project-flow.conf & GitHub Project
+project-flow setup            # Create .project-flow/config & GitHub Project
 project-flow start            # Start pollers (background)
 project-flow start --attach   # Start and attach to tmux
 project-flow stop             # Stop pollers
