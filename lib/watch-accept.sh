@@ -5,22 +5,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/init.sh"
 LOG_FILE="$LOG_DIR/accept.log"
 log_info "Accept watcher started" | tee -a "$LOG_FILE"
 
-get_linked_pr() {
-  local issue_number="$1"
-  local pr_url
-  pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/comments" \
-    --jq '.[].body' 2>/dev/null \
-    | grep -oE 'https://github.com/[^/]+/[^/]+/pull/[0-9]+' \
-    | tail -1 || echo "")
-
-  if [[ -z "$pr_url" ]]; then
-    pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/timeline" \
-      --jq '.[] | select(.event == "cross-referenced") | .source.issue.pull_request.html_url // empty' \
-      2>/dev/null | tail -1 || echo "")
-  fi
-  echo "$pr_url"
-}
-
 while true; do
   log_debug "Checking for Accept issues..." >> "$LOG_FILE"
 

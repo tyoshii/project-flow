@@ -2,8 +2,16 @@
 # helpers.sh — GitHub Project GraphQL helper functions
 # Requires config.sh to be sourced first
 
-# Get Project node ID
+# Cached project ID (computed once per process)
+_CACHED_PROJECT_ID=""
+
+# Get Project node ID (cached)
 get_project_id() {
+  if [[ -n "$_CACHED_PROJECT_ID" ]]; then
+    echo "$_CACHED_PROJECT_ID"
+    return
+  fi
+
   local result
   result=$(gh api graphql -f query='
     query($owner: String!, $number: Int!) {
@@ -14,10 +22,10 @@ get_project_id() {
       }
     }
   ' -f owner="$OWNER" -F number="$PROJECT_NUMBER" \
-    --jq '.data.organization.projectV2.id' 2>/dev/null) && [[ -n "$result" ]] && echo "$result" && return
+    --jq '.data.organization.projectV2.id' 2>/dev/null) && [[ -n "$result" ]] && _CACHED_PROJECT_ID="$result" && echo "$result" && return
 
   # Fallback to user if not an organization
-  gh api graphql -f query='
+  result=$(gh api graphql -f query='
     query($owner: String!, $number: Int!) {
       user(login: $owner) {
         projectV2(number: $number) {
@@ -26,15 +34,26 @@ get_project_id() {
       }
     }
   ' -f owner="$OWNER" -F number="$PROJECT_NUMBER" \
-    --jq '.data.user.projectV2.id'
+    --jq '.data.user.projectV2.id')
+  _CACHED_PROJECT_ID="$result"
+  echo "$result"
 }
 
-# Get Status field ID and option IDs
+# Cached status field JSON (computed once per process)
+_CACHED_STATUS_FIELD=""
+
+# Get Status field ID and option IDs (cached)
 get_status_field() {
+  if [[ -n "$_CACHED_STATUS_FIELD" ]]; then
+    echo "$_CACHED_STATUS_FIELD"
+    return
+  fi
+
   local project_id
   project_id=$(get_project_id)
 
-  gh api graphql -f query='
+  local result
+  result=$(gh api graphql -f query='
     query($projectId: ID!) {
       node(id: $projectId) {
         ... on ProjectV2 {
@@ -54,7 +73,9 @@ get_status_field() {
       }
     }
   ' -f projectId="$project_id" \
-    --jq '.data.node.fields.nodes[] | select(.name == "'"$STATUS_FIELD_NAME"'")'
+    --jq '.data.node.fields.nodes[] | select(.name == "'"$STATUS_FIELD_NAME"'")')
+  _CACHED_STATUS_FIELD="$result"
+  echo "$result"
 }
 
 # Get items by status
@@ -183,6 +204,24 @@ get_issue_details() {
     }
   ' -f owner="$OWNER" -f repo="$REPO_NAME" -F number="$issue_number" \
     --jq '.data.repository.issue'
+}
+
+# Get linked PR URL for an issue
+# Searches issue comments first, then timeline cross-references
+get_linked_pr() {
+  local issue_number="$1"
+  local pr_url
+  pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/comments" \
+    --jq '.[].body' 2>/dev/null \
+    | grep -oE 'https://github.com/[^/]+/[^/]+/pull/[0-9]+' \
+    | tail -1 || echo "")
+
+  if [[ -z "$pr_url" ]]; then
+    pr_url=$(gh api "repos/${REPO}/issues/${issue_number}/timeline" \
+      --jq '.[] | select(.event == "cross-referenced") | .source.issue.pull_request.html_url // empty' \
+      2>/dev/null | tail -1 || echo "")
+  fi
+  echo "$pr_url"
 }
 
 # Add comment to issue
@@ -355,6 +394,9 @@ msg() {
         "review.no_pr")         echo "リンクされた PR が見つかりません。Dev に戻します。" ;;
         "review.lgtm")          echo "LGTM — QA に移動します。PR #%s をご確認ください。" ;;
         "review.changes")       echo "PR #%s に変更をリクエストしました。Dev に戻します。" ;;
+        "review.fix_history")   echo "レビュー・修正の履歴" ;;
+        "review.escalate")      echo "%sラウンドのレビュー・修正で完全には解決できませんでした。以下はレビューの履歴です。" ;;
+        "review.escalate_qa")   echo "PR #%s のレビューを3ラウンド実施しました。解決できなかった指摘があります。QA に移動します — 人間の確認をお願いします。" ;;
         "accept.merge_failed")  echo "PR #%s のマージに失敗しました。手動で確認してください。" ;;
         "accept.done")          echo "PR をマージし、Issue をクローズしました。" ;;
         "analysis.questions")   echo "自動分析に質問があります。回答後、Analysis に戻してください。" ;;
@@ -377,6 +419,9 @@ msg() {
         "review.no_pr")         echo "No linked PR found. Moving back to Dev." ;;
         "review.lgtm")          echo "LGTM — moving to QA. Please review PR #%s." ;;
         "review.changes")       echo "Changes requested on PR #%s. Moving back to Dev." ;;
+        "review.fix_history")   echo "Review & fix history" ;;
+        "review.escalate")      echo "Could not fully resolve after %s rounds of review & fix. See review history below." ;;
+        "review.escalate_qa")   echo "Reviewed PR #%s over 3 rounds. Some issues remain unresolved. Moving to QA — human review needed." ;;
         "accept.merge_failed")  echo "Failed to merge PR #%s. Please check manually." ;;
         "accept.done")          echo "PR merged & issue closed." ;;
         "analysis.questions")   echo "Automated analysis has questions. Please answer and move back to Analysis." ;;

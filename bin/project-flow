@@ -118,6 +118,10 @@ EOF
     cat > ".project-flow/.gitignore" << 'GITIGNORE'
 logs/
 GITIGNORE
+    # Add .worktrees to repo .gitignore
+    if ! grep -qx '.worktrees/' .gitignore 2>/dev/null; then
+      echo '.worktrees/' >> .gitignore
+    fi
   fi
 
   echo ""
