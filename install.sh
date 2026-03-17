@@ -7,31 +7,89 @@ REPO_URL="https://github.com/tyoshii/project-flow.git"
 
 echo "=== project-flow インストーラー ==="
 
-# 前提条件チェック
+# パッケージマネージャを検出
+detect_pkg_manager() {
+  if command -v brew >/dev/null 2>&1; then
+    echo "brew"
+  elif command -v apt-get >/dev/null 2>&1; then
+    echo "apt"
+  elif command -v dnf >/dev/null 2>&1; then
+    echo "dnf"
+  elif command -v pacman >/dev/null 2>&1; then
+    echo "pacman"
+  else
+    echo ""
+  fi
+}
+
+# パッケージマネージャでツールをインストール
+install_pkg() {
+  local pkg="$1"
+  local pkg_manager="$2"
+
+  echo "  ${pkg} をインストール中..."
+  case "$pkg_manager" in
+    brew)   brew install "$pkg" ;;
+    apt)    sudo apt-get install -y "$pkg" ;;
+    dnf)    sudo dnf install -y "$pkg" ;;
+    pacman) sudo pacman -S --noconfirm "$pkg" ;;
+  esac
+}
+
+# 前提条件チェック & 自動インストール
 check_deps() {
+  # git は最初に必要（インストーラー自体が使う）
+  if ! command -v git >/dev/null 2>&1; then
+    echo "ERROR: git がインストールされていません。先に git をインストールしてください。"
+    exit 1
+  fi
+
+  local pkg_manager
+  pkg_manager=$(detect_pkg_manager)
+
+  # brew でインストール可能なツール
+  local brew_tools=("gh" "jq" "tmux")
   local missing=()
-  command -v gh >/dev/null 2>&1 || missing+=("gh (GitHub CLI)")
-  command -v jq >/dev/null 2>&1 || missing+=("jq")
-  command -v tmux >/dev/null 2>&1 || missing+=("tmux")
-  command -v claude >/dev/null 2>&1 || missing+=("claude (Claude Code CLI)")
-  command -v git >/dev/null 2>&1 || missing+=("git")
+
+  for tool in "${brew_tools[@]}"; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      missing+=("$tool")
+    fi
+  done
 
   if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "ERROR: 以下のツールがインストールされていません:"
-    for dep in "${missing[@]}"; do
-      echo "  - $dep"
+    if [[ -z "$pkg_manager" ]]; then
+      echo "ERROR: 以下のツールがインストールされていません:"
+      for dep in "${missing[@]}"; do
+        echo "  - $dep"
+      done
+      echo ""
+      echo "パッケージマネージャ (brew, apt, dnf, pacman) が見つかりません。手動でインストールしてください。"
+      exit 1
+    fi
+
+    echo "不足しているツールをインストールします (${pkg_manager})..."
+    for tool in "${missing[@]}"; do
+      install_pkg "$tool" "$pkg_manager"
     done
-    echo ""
-    echo "インストール方法:"
-    echo "  brew install gh jq tmux"
-    echo "  Claude Code: https://docs.anthropic.com/en/docs/claude-code"
-    exit 1
+  fi
+
+  # Claude Code CLI
+  if ! command -v claude >/dev/null 2>&1; then
+    if command -v npm >/dev/null 2>&1; then
+      echo "  Claude Code CLI をインストール中..."
+      npm install -g @anthropic-ai/claude-code
+    else
+      echo "ERROR: claude (Claude Code CLI) がインストールされていません。"
+      echo "  インストール方法: https://docs.anthropic.com/en/docs/claude-code"
+      exit 1
+    fi
   fi
 
   # gh ログインチェック
   if ! gh auth status >/dev/null 2>&1; then
-    echo "ERROR: gh にログインしてください: gh auth login"
-    exit 1
+    echo "gh にログインしてください:"
+    gh auth login
   fi
 
   echo "✓ 依存ツールのチェック完了"
