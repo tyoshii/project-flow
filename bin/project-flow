@@ -77,12 +77,46 @@ cmd_setup() {
   echo "Repository: ${repo_slug}"
   echo ""
 
-  local project_number
-  read -p "Existing GitHub Project number? (leave empty to create new): " project_number
+  # List existing GitHub Projects as candidates
+  local project_number=""
+  local projects_json
+  projects_json=$(gh project list --owner "$owner" --format json --limit 20 2>/dev/null || echo '{"projects":[]}')
+  local project_count
+  project_count=$(echo "$projects_json" | jq '.projects | length')
 
-  if [[ -n "$project_number" ]]; then
-    echo "Using existing Project #${project_number}"
+  if [[ "$project_count" -gt 0 ]]; then
+    echo "GitHub Projects:"
+    local i=1
+    while IFS= read -r line; do
+      local p_number p_title
+      p_number=$(echo "$line" | jq -r '.number')
+      p_title=$(echo "$line" | jq -r '.title')
+      echo "  ${i}) ${p_title}  (#${p_number})"
+      i=$((i + 1))
+    done < <(echo "$projects_json" | jq -c '.projects[]')
+    echo "  N) Create new project"
+    echo ""
+
+    local selection
+    read -p "Select [1-${project_count}/N]: " selection
+
+    if [[ "$selection" =~ ^[0-9]+$ ]] && [[ "$selection" -ge 1 ]] && [[ "$selection" -le "$project_count" ]]; then
+      project_number=$(echo "$projects_json" | jq -r ".projects[$((selection - 1))].number")
+      local project_title
+      project_title=$(echo "$projects_json" | jq -r ".projects[$((selection - 1))].title")
+      echo "Using: ${project_title} (#${project_number})"
+    elif [[ "$selection" == "N" || "$selection" == "n" ]]; then
+      selection=""  # fall through to create
+    else
+      echo "Invalid selection."
+      exit 1
+    fi
   else
+    echo "No existing GitHub Projects found for ${owner}."
+    echo ""
+  fi
+
+  if [[ -z "$project_number" ]]; then
     echo "Creating GitHub Project..."
     local project_url
     project_url=$(gh project create --owner "$owner" --title "${repo_name} Dev Flow" --format json | jq -r '.url')
