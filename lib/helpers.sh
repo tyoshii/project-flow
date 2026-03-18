@@ -78,6 +78,54 @@ get_status_field() {
   echo "$result"
 }
 
+# Validate that all required statuses exist in the project
+# Returns 0 if all OK, 1 if missing statuses found
+validate_statuses() {
+  local status_info
+  status_info=$(get_status_field)
+
+  if [[ -z "$status_info" ]]; then
+    echo "ERROR: Status field '${STATUS_FIELD_NAME}' not found in Project #${PROJECT_NUMBER}." >&2
+    return 1
+  fi
+
+  local available
+  available=$(echo "$status_info" | jq -r '.options[].name')
+
+  local required_statuses=(
+    "$STATUS_BACKLOG"
+    "$STATUS_ANALYSIS"
+    "$STATUS_DEV"
+    "$STATUS_REVIEW"
+    "$STATUS_QA"
+    "$STATUS_ACCEPT"
+    "$STATUS_DONE"
+  )
+
+  local missing=()
+  for status in "${required_statuses[@]}"; do
+    if ! echo "$available" | grep -qx "$status"; then
+      missing+=("$status")
+    fi
+  done
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "ERROR: Required statuses missing from Project #${PROJECT_NUMBER}:" >&2
+    for m in "${missing[@]}"; do
+      echo "  - $m" >&2
+    done
+    echo "" >&2
+    echo "Add them at:" >&2
+    echo "  https://github.com/orgs/${OWNER}/projects/${PROJECT_NUMBER}/settings" >&2
+    echo "  (Personal: https://github.com/users/${OWNER}/projects/${PROJECT_NUMBER}/settings)" >&2
+    echo "" >&2
+    echo "Available statuses: $(echo "$available" | tr '\n' ', ' | sed 's/,$//')" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 # Get items by status
 get_items_by_status() {
   local target_status="$1"
@@ -152,8 +200,16 @@ move_item_to_status() {
   option_id=$(echo "$status_info" | jq -r '.options[] | select(.name == "'"$target_status"'") | .id')
 
   if [[ -z "$option_id" ]]; then
-    echo "ERROR: Status option '$target_status' not found" >&2
-    return 1
+    log_warn "Status option '$target_status' not found. Falling back to '${STATUS_BACKLOG}'."
+    if [[ "$target_status" == "$STATUS_BACKLOG" ]]; then
+      echo "ERROR: Fallback status '${STATUS_BACKLOG}' also not found. Cannot move item." >&2
+      return 1
+    fi
+    option_id=$(echo "$status_info" | jq -r '.options[] | select(.name == "'"$STATUS_BACKLOG"'") | .id')
+    if [[ -z "$option_id" ]]; then
+      echo "ERROR: Fallback status '${STATUS_BACKLOG}' not found. Cannot move item." >&2
+      return 1
+    fi
   fi
 
   gh api graphql -f query='

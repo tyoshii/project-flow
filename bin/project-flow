@@ -175,6 +175,7 @@ GITIGNORE
 cmd_start() {
   source "$PROJECT_FLOW_DIR/lib/config.sh"
   load_project_config
+  source "$PROJECT_FLOW_DIR/lib/helpers.sh"
 
   if [[ -z "$PROJECT_NUMBER" ]]; then
     echo "ERROR: PROJECT_NUMBER is not set. Run project-flow setup first."
@@ -190,6 +191,15 @@ cmd_start() {
     echo "  project-flow restart   # stop and start again"
     exit 0
   fi
+
+  # Validate required statuses exist in the project
+  echo "Checking project statuses..."
+  if ! validate_statuses; then
+    echo ""
+    echo "Fix the missing statuses and try again."
+    exit 1
+  fi
+  echo "  All statuses OK."
 
   echo "Starting project-flow..."
   echo "  Project: ${REPO} (#${PROJECT_NUMBER})"
