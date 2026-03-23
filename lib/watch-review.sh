@@ -281,7 +281,8 @@ ${claude_output}"
 ${all_feedback}"
           fi
 
-          gh pr review "$pr_number" --repo "$REPO" --approve --body "$review_body" 2>/dev/null || true
+          gh pr review "$pr_number" --repo "$REPO" --approve --body "🤖 LGTM" 2>/dev/null || true
+          gh pr comment "$pr_number" --repo "$REPO" --body "$review_body" 2>/dev/null || true
           add_issue_comment "$issue_number" "🤖 Review: $(printf "$(msg "review.lgtm")" "$pr_number")"
           move_item_to_status "$item_id" "$STATUS_QA"
           ;;
